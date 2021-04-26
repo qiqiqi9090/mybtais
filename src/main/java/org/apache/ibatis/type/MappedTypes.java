@@ -40,7 +40,7 @@ import java.lang.annotation.Target;
 public @interface MappedTypes {
   /**
    * Returns java types to map {@link TypeHandler}.
-   *
+   * 匹配的 Java Type 类型的数组
    * @return java types
    */
   Class<?>[] value();
