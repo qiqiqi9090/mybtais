@@ -20,13 +20,25 @@ import org.apache.ibatis.logging.Log;
 import org.apache.ibatis.logging.LogFactory;
 
 /**
+ * 支持打印日志的 Cache 实现
  * @author Clinton Begin
  */
 public class LoggingCache implements Cache {
-
+  /**
+   * MyBatis Log 对象
+   */
   private final Log log;
+  /**
+   * 装饰的 Cache 对象
+   */
   private final Cache delegate;
+  /**
+   * 统计请求缓存的次数
+   */
   protected int requests = 0;
+  /**
+   * 统计命中缓存的次数
+   */
   protected int hits = 0;
 
   public LoggingCache(Cache delegate) {
@@ -51,9 +63,12 @@ public class LoggingCache implements Cache {
 
   @Override
   public Object getObject(Object key) {
+    // 请求次数 ++
     requests++;
+    // 获得缓存
     final Object value = delegate.getObject(key);
     if (value != null) {
+      // 如果命中缓存，则命中次数 ++
       hits++;
     }
     if (log.isDebugEnabled()) {

@@ -15,16 +15,16 @@
  */
 package org.apache.ibatis.cache.decorators;
 
+import org.apache.ibatis.cache.Cache;
+import org.apache.ibatis.cache.CacheException;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.ibatis.cache.Cache;
-import org.apache.ibatis.cache.CacheException;
-
 /**
  * <p>Simple blocking decorator
- *
+ * 阻塞的 Cache 实现类
  * <p>Simple and inefficient version of EhCache's BlockingCache decorator.
  * It sets a lock over a cache key when the element is not found in cache.
  * This way, other threads will wait until this element is filled instead of hitting the database.
@@ -35,9 +35,17 @@ import org.apache.ibatis.cache.CacheException;
  *
  */
 public class BlockingCache implements Cache {
-
+  /**
+   * 阻塞等待超时时间
+   */
   private long timeout;
+  /**
+   * 装饰的 Cache 对象
+   */
   private final Cache delegate;
+  /**
+   * 缓存键与 ReentrantLock 对象的映射
+   */
   private final ConcurrentHashMap<Object, CountDownLatch> locks;
 
   public BlockingCache(Cache delegate) {
@@ -58,17 +66,22 @@ public class BlockingCache implements Cache {
   @Override
   public void putObject(Object key, Object value) {
     try {
+      // <2.1> 添加缓存
       delegate.putObject(key, value);
     } finally {
+      // <2.2> 释放锁
       releaseLock(key);
     }
   }
 
   @Override
   public Object getObject(Object key) {
+    // <1.1> 获得锁
     acquireLock(key);
     Object value = delegate.getObject(key);
+    // <1.2> 获得缓存值
     if (value != null) {
+      // <1.3> 释放锁
       releaseLock(key);
     }
     return value;
@@ -77,6 +90,7 @@ public class BlockingCache implements Cache {
   @Override
   public Object removeObject(Object key) {
     // despite of its name, this method is called only to release locks
+    // 释放锁
     releaseLock(key);
     return null;
   }
