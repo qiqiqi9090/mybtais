@@ -15,12 +15,11 @@
  */
 package org.apache.ibatis.transaction;
 
-import java.sql.Connection;
-import java.util.Properties;
+import org.apache.ibatis.session.TransactionIsolationLevel;
 
 import javax.sql.DataSource;
-
-import org.apache.ibatis.session.TransactionIsolationLevel;
+import java.sql.Connection;
+import java.util.Properties;
 
 /**
  * Creates {@link Transaction} instances.
@@ -30,6 +29,7 @@ import org.apache.ibatis.session.TransactionIsolationLevel;
 public interface TransactionFactory {
 
   /**
+   * 设置工厂的属性
    * Sets transaction factory custom properties.
    * @param props
    *          the new properties
