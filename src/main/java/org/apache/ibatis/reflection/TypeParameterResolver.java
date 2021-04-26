@@ -32,7 +32,7 @@ public class TypeParameterResolver {
 
   /**
    * Resolve field type.
-   *
+   *解析属性类型
    * @param field
    *          the field
    * @param srcType
@@ -41,14 +41,17 @@ public class TypeParameterResolver {
    *         they will be resolved to the actual runtime {@link Type}s.
    */
   public static Type resolveFieldType(Field field, Type srcType) {
+    // 属性类型
     Type fieldType = field.getGenericType();
+    // 定义的类
     Class<?> declaringClass = field.getDeclaringClass();
+    // 解析类型
     return resolveType(fieldType, srcType, declaringClass);
   }
 
   /**
    * Resolve return type.
-   *
+   *解析方法返回类型
    * @param method
    *          the method
    * @param srcType
@@ -64,7 +67,7 @@ public class TypeParameterResolver {
 
   /**
    * Resolve param types.
-   *
+   *解析方法参数的类型数组
    * @param method
    *          the method
    * @param srcType
@@ -74,8 +77,11 @@ public class TypeParameterResolver {
    *         they will be resolved to the actual runtime {@link Type}s.
    */
   public static Type[] resolveParamTypes(Method method, Type srcType) {
+    // 获得方法参数类型数组
     Type[] paramTypes = method.getGenericParameterTypes();
+    // 定义的类
     Class<?> declaringClass = method.getDeclaringClass();
+    // 解析类型们
     Type[] result = new Type[paramTypes.length];
     for (int i = 0; i < paramTypes.length; i++) {
       result[i] = resolveType(paramTypes[i], srcType, declaringClass);
@@ -83,6 +89,13 @@ public class TypeParameterResolver {
     return result;
   }
 
+  /**
+   * 解析类型
+   * @param type 类型
+   * @param srcType 来源类型
+   * @param declaringClass 定义的类
+   * @return 解析后的类型
+   */
   private static Type resolveType(Type type, Type srcType, Class<?> declaringClass) {
     if (type instanceof TypeVariable) {
       return resolveTypeVar((TypeVariable<?>) type, srcType, declaringClass);
@@ -111,9 +124,17 @@ public class TypeParameterResolver {
       return new GenericArrayTypeImpl(resolvedComponentType);
     }
   }
-
+  /**
+   * 解析 ParameterizedType 类型
+   *
+   * @param parameterizedType ParameterizedType 类型
+   * @param srcType 来源类型
+   * @param declaringClass 定义的类
+   * @return 解析后的类型
+   */
   private static ParameterizedType resolveParameterizedType(ParameterizedType parameterizedType, Type srcType, Class<?> declaringClass) {
     Class<?> rawType = (Class<?>) parameterizedType.getRawType();
+    // 【1】解析 <> 中实际类型
     Type[] typeArgs = parameterizedType.getActualTypeArguments();
     Type[] args = new Type[typeArgs.length];
     for (int i = 0; i < typeArgs.length; i++) {
@@ -131,12 +152,15 @@ public class TypeParameterResolver {
   }
 
   private static Type resolveWildcardType(WildcardType wildcardType, Type srcType, Class<?> declaringClass) {
+    // <1.1> 解析泛型表达式下界（下限 super）
     Type[] lowerBounds = resolveWildcardTypeBounds(wildcardType.getLowerBounds(), srcType, declaringClass);
+    // <1.2> 解析泛型表达式上界（上限 extends）
     Type[] upperBounds = resolveWildcardTypeBounds(wildcardType.getUpperBounds(), srcType, declaringClass);
     return new WildcardTypeImpl(lowerBounds, upperBounds);
   }
 
   private static Type[] resolveWildcardTypeBounds(Type[] bounds, Type srcType, Class<?> declaringClass) {
+
     Type[] result = new Type[bounds.length];
     for (int i = 0; i < bounds.length; i++) {
       if (bounds[i] instanceof TypeVariable) {
@@ -238,10 +262,22 @@ public class TypeParameterResolver {
   }
 
   static class ParameterizedTypeImpl implements ParameterizedType {
+    // 以 List<T> 举例子
+    /**
+     * <> 前面实际类型
+     *
+     * 例如：List
+     */
     private Class<?> rawType;
-
+    /**
+     * 如果这个类型是某个属性所有，则获取这个所有者类型；否则，返回 null
+     */
     private Type ownerType;
-
+    /**
+     * <> 中实际类型
+     *
+     * 例如：T
+     */
     private Type[] actualTypeArguments;
 
     public ParameterizedTypeImpl(Class<?> rawType, Type ownerType, Type[] actualTypeArguments) {
