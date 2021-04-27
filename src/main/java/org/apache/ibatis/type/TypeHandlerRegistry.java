@@ -399,7 +399,9 @@ public final class TypeHandlerRegistry {
     register((Type) type, jdbcType, handler);
   }
 
-  private void register(Type javaType, JdbcType jdbcType, TypeHandler<?> handler) {
+  private void
+
+  register(Type javaType, JdbcType jdbcType, TypeHandler<?> handler) {
     if (javaType != null) {
       Map<JdbcType, TypeHandler<?>> map = typeHandlerMap.get(javaType);
       if (map == null || map == NULL_TYPE_HANDLER_MAP) {

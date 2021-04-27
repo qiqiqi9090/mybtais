@@ -15,22 +15,40 @@
  */
 package org.apache.ibatis.builder;
 
-import java.util.List;
-
 import org.apache.ibatis.mapping.Discriminator;
 import org.apache.ibatis.mapping.ResultMap;
 import org.apache.ibatis.mapping.ResultMapping;
+
+import java.util.List;
 
 /**
  * @author Eduardo Macarron
  */
 public class ResultMapResolver {
   private final MapperBuilderAssistant assistant;
+  /**
+   * ResultMap 编号
+   */
   private final String id;
+  /**
+   * 类型
+   */
   private final Class<?> type;
+  /**
+   * 继承自哪个 ResultMap
+   */
   private final String extend;
+  /**
+   * Discriminator 对象
+   */
   private final Discriminator discriminator;
+  /**
+   * ResultMapping 集合
+   */
   private final List<ResultMapping> resultMappings;
+  /**
+   * 是否自动匹配
+   */
   private final Boolean autoMapping;
 
   public ResultMapResolver(MapperBuilderAssistant assistant, String id, Class<?> type, String extend, Discriminator discriminator, List<ResultMapping> resultMappings, Boolean autoMapping) {

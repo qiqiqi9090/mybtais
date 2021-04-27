@@ -15,11 +15,6 @@
  */
 package org.apache.ibatis.builder.xml;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.builder.IncompleteElementException;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -29,6 +24,11 @@ import org.apache.ibatis.session.Configuration;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 
 /**
  * @author Frank D. Martinez [mnesarco]
@@ -44,34 +44,61 @@ public class XMLIncludeTransformer {
   }
 
   public void applyIncludes(Node source) {
+    // <1> 创建 variablesContext ，并将 configurationVariables 添加到其中
     Properties variablesContext = new Properties();
     Properties configurationVariables = configuration.getVariables();
     Optional.ofNullable(configurationVariables).ifPresent(variablesContext::putAll);
+    // <2> 处理 <include />
     applyIncludes(source, variablesContext, false);
   }
 
   /**
    * Recursively apply includes through all SQL fragments.
+   *<properties>
+   *     <property name="cpu" value="16c" />
+   *     <property name="target_sql" value="123" />
+   * </properties>
    *
+   * // Mapper.xml
+   *
+   * <sql id="123" lang="${cpu}">
+   *     ${cpu}
+   *     aoteman
+   *     qqqq
+   * </sql>
+   *
+   * <select id="testForInclude">
+   *     SELECT * FROM subject
+   *     <include refid="${target_sql}" />
+   * </select>
    * @param source
    *          Include node in DOM tree
    * @param variablesContext
    *          Current context for static variables with values
    */
   private void applyIncludes(Node source, final Properties variablesContext, boolean included) {
+    // <1> 如果是 <include /> 标签
     if ("include".equals(source.getNodeName())) {
+      // <1.1> 获得 <sql /> 对应的节点
       Node toInclude = findSqlFragment(getStringAttribute(source, "refid"), variablesContext);
+      // <1.2> 获得包含 <include /> 标签内的属性
       Properties toIncludeContext = getVariablesContext(source, variablesContext);
+      // <1.3> 递归调用 #applyIncludes(...) 方法，继续替换。注意，此处是 <sql /> 对应的节点
       applyIncludes(toInclude, toIncludeContext, true);
       if (toInclude.getOwnerDocument() != source.getOwnerDocument()) {
         toInclude = source.getOwnerDocument().importNode(toInclude, true);
       }
-      source.getParentNode().replaceChild(toInclude, source);
+      // <1.4> 将 <include /> 节点替换成 <sql /> 节点
+      source.getParentNode().replaceChild(toInclude, source);// 注意，这是一个奇葩的 API ，前者为 newNode ，后者为 oldNode
+      // <1.4> 将 <sql /> 子节点添加到 <sql /> 节点前面
       while (toInclude.hasChildNodes()) {
         toInclude.getParentNode().insertBefore(toInclude.getFirstChild(), toInclude);
       }
+      // <1.4> 移除 <include /> 标签自身
       toInclude.getParentNode().removeChild(toInclude);
+      // <2> 如果节点类型为 Node.ELEMENT_NODE
     } else if (source.getNodeType() == Node.ELEMENT_NODE) {
+      // <2.1> 如果在处理 <include /> 标签中，则替换其上的属性，例如 <sql id="123" lang="${cpu}"> 的情况，lang 属性是可以被替换的
       if (included && !variablesContext.isEmpty()) {
         // replace variables in attribute values
         NamedNodeMap attributes = source.getAttributes();
@@ -80,10 +107,13 @@ public class XMLIncludeTransformer {
           attr.setNodeValue(PropertyParser.parse(attr.getNodeValue(), variablesContext));
         }
       }
+      // <2.2> 遍历子节点，递归调用 #applyIncludes(...) 方法，继续替换
       NodeList children = source.getChildNodes();
       for (int i = 0; i < children.getLength(); i++) {
         applyIncludes(children.item(i), variablesContext, included);
       }
+      // <3> 如果在处理 <include /> 标签中，并且节点类型为 Node.TEXT_NODE ，并且变量非空
+      // 则进行变量的替换，并修改原节点 source
     } else if (included && (source.getNodeType() == Node.TEXT_NODE || source.getNodeType() == Node.CDATA_SECTION_NODE)
         && !variablesContext.isEmpty()) {
       // replace variables in text node
@@ -92,10 +122,14 @@ public class XMLIncludeTransformer {
   }
 
   private Node findSqlFragment(String refid, Properties variables) {
+    // 因为 refid 可能是动态变量，所以进行替换
     refid = PropertyParser.parse(refid, variables);
+    // 获得完整的 refid ，格式为 "${namespace}.${refid}"
     refid = builderAssistant.applyCurrentNamespace(refid, true);
     try {
+      // 获得对应的 <sql /> 节点
       XNode nodeToInclude = configuration.getSqlFragments().get(refid);
+      // 获得 Node 节点，进行克隆
       return nodeToInclude.getNode().cloneNode(true);
     } catch (IllegalArgumentException e) {
       throw new IncompleteElementException("Could not find SQL statement to include with refid '" + refid + "'", e);
@@ -108,7 +142,15 @@ public class XMLIncludeTransformer {
 
   /**
    * Read placeholders and their values from include node definition.
+   *<sql id="userColumns"> ${alias}.id,${alias}.username,${alias}.password </sql>
    *
+   * <select id="selectUsers" resultType="map">
+   *   select
+   *     <include refid="userColumns"><property name="alias" value="t1"/></include>,
+   *     <include refid="userColumns"><property name="alias" value="t2"/></include>
+   *   from some_table t1
+   *     cross join some_table t2
+   * </select>
    * @param node
    *          Include node instance
    * @param inheritedVariablesContext
@@ -116,6 +158,7 @@ public class XMLIncludeTransformer {
    * @return variables context from include instance (no inherited values)
    */
   private Properties getVariablesContext(Node node, Properties inheritedVariablesContext) {
+    // 获得 <include /> 标签的属性集合
     Map<String, String> declaredProperties = null;
     NodeList children = node.getChildNodes();
     for (int i = 0; i < children.getLength(); i++) {
