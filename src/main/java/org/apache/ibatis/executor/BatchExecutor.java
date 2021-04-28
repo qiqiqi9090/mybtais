@@ -15,14 +15,6 @@
  */
 package org.apache.ibatis.executor;
 
-import java.sql.BatchUpdateException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import org.apache.ibatis.cursor.Cursor;
 import org.apache.ibatis.executor.keygen.Jdbc3KeyGenerator;
 import org.apache.ibatis.executor.keygen.KeyGenerator;
@@ -35,15 +27,33 @@ import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.RowBounds;
 import org.apache.ibatis.transaction.Transaction;
 
+import java.sql.BatchUpdateException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * @author Jeff Butler
  */
 public class BatchExecutor extends BaseExecutor {
 
   public static final int BATCH_UPDATE_RETURN_VALUE = Integer.MIN_VALUE + 1002;
-
+  /**
+   * Statement 数组
+   */
   private final List<Statement> statementList = new ArrayList<>();
+  /**
+   * BatchResult 数组
+   *
+   * 每一个 BatchResult 元素，对应一个 {@link #statementList} 的 Statement 元素
+   */
   private final List<BatchResult> batchResultList = new ArrayList<>();
+  /**
+   * 当前 SQL
+   */
   private String currentSql;
   private MappedStatement currentStatement;
 
@@ -54,19 +64,27 @@ public class BatchExecutor extends BaseExecutor {
   @Override
   public int doUpdate(MappedStatement ms, Object parameterObject) throws SQLException {
     final Configuration configuration = ms.getConfiguration();
+    // <1> 创建 StatementHandler 对象
     final StatementHandler handler = configuration.newStatementHandler(this, ms, parameterObject, RowBounds.DEFAULT, null, null);
     final BoundSql boundSql = handler.getBoundSql();
     final String sql = boundSql.getSql();
     final Statement stmt;
+    // <2> 如果匹配最后一次 currentSql 和 currentStatement ，则聚合到 BatchResult 中
     if (sql.equals(currentSql) && ms.equals(currentStatement)) {
+      // <2.1> 获得最后一次的 Statement 对象
       int last = statementList.size() - 1;
       stmt = statementList.get(last);
+      // <2.2> 设置事务超时时间
       applyTransactionTimeout(stmt);
+      // <2.3> 设置 SQL 上的参数，例如 PrepareStatement 对象上的占位符
       handler.parameterize(stmt);// fix Issues 322
+      // <2.4> 获得最后一次的 BatchResult 对象，并添加参数到其中
       BatchResult batchResult = batchResultList.get(last);
       batchResult.addParameterObject(parameterObject);
-    } else {
+    } else {// <3> 如果不匹配最后一次 currentSql 和 currentStatement ，则新建 BatchResult 对象
+      // <3.1> 获得 Connection
       Connection connection = getConnection(ms.getStatementLog());
+      // <3.2> 创建 Statement 或 PrepareStatement 对象
       stmt = handler.prepare(connection, transaction.getTimeout());
       handler.parameterize(stmt);    // fix Issues 322
       currentSql = sql;
@@ -74,6 +92,7 @@ public class BatchExecutor extends BaseExecutor {
       statementList.add(stmt);
       batchResultList.add(new BatchResult(ms, sql, parameterObject));
     }
+    // <4> 批处理
     handler.batch(stmt);
     return BATCH_UPDATE_RETURN_VALUE;
   }
